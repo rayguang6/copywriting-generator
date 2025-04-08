@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useRouter } from 'next/navigation';
 
@@ -11,8 +11,15 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const { signIn, signUp } = useAuthContext();
+  const { user, signIn, signUp } = useAuthContext();
   const router = useRouter();
+
+  // Redirect to home if already authenticated
+  useEffect(() => {
+    if (user) {
+      window.location.href = '/';
+    }
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
