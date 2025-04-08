@@ -7,15 +7,15 @@ import { User } from '@supabase/supabase-js';
 type AuthContextType = {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: Error }>;
-  signUp: (email: string, password: string) => Promise<{ error?: Error }>;
+  signIn: (email: string, password: string) => Promise<{ error?: Error | string }>;
+  signUp: (email: string, password: string) => Promise<{ error?: Error | string }>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { user, loading, signIn: authSignIn, signUp: authSignUp, signOut } = useAuth();
+  const { user, loading, signIn: authSignIn, signUp: authSignUp, signOut: authSignOut } = useAuth();
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { 
         error: error instanceof Error 
           ? error 
-          : new Error('Failed to sign in. Please check your credentials.')
+          : 'Failed to sign in. Please check your credentials.'
       };
     }
   };
@@ -40,8 +40,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { 
         error: error instanceof Error 
           ? error 
-          : new Error('Failed to sign up. Please try again later.')
+          : 'Failed to sign up. Please try again later.'
       };
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      await authSignOut();
+      // Force a hard redirect to the auth page
+      window.location.href = '/auth';
+    } catch (error) {
+      console.error('Sign out error:', error);
     }
   };
 

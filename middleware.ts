@@ -10,10 +10,11 @@ export async function middleware(request: NextRequest) {
   }
   
   try {
+    // Create middleware client
     const response = NextResponse.next();
     const supabase = createMiddlewareClient({ req: request, res: response });
     
-    // This refreshes the user's session
+    // This refreshes the user's session (no redirects needed)
     await supabase.auth.getSession();
     
     return response;
@@ -23,7 +24,7 @@ export async function middleware(request: NextRequest) {
   }
 }
 
-// Add matcher to specify which routes this middleware applies to
+// Only exclude static files and assets
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/auth/callback).*)']
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
 } 

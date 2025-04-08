@@ -35,7 +35,7 @@ export default function AuthPage() {
         if (result.error) {
           setError(typeof result.error === 'string' ? result.error : result.error.message);
         } else {
-          router.push('/');
+          window.location.href = '/';
         }
       }
     } catch (err) {
