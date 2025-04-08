@@ -7,11 +7,27 @@ CREATE TABLE IF NOT EXISTS profiles (
   avatar_url TEXT
 );
 
+-- Create business_profiles table for multiple business profiles per user
+CREATE TABLE IF NOT EXISTS business_profiles (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  name TEXT NOT NULL,
+  industry TEXT,
+  target_audience TEXT,
+  unique_value_proposition TEXT,
+  pain_points TEXT,
+  brand_voice TEXT,
+  is_default BOOLEAN DEFAULT FALSE
+);
+
 -- Create copywriting_history table
 CREATE TABLE IF NOT EXISTS copywriting_history (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   user_id UUID REFERENCES auth.users NOT NULL,
+  business_profile_id UUID REFERENCES business_profiles,
   framework TEXT NOT NULL,
   prompt TEXT NOT NULL,
   result TEXT NOT NULL
@@ -19,6 +35,7 @@ CREATE TABLE IF NOT EXISTS copywriting_history (
 
 -- Set up Row Level Security (RLS)
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE copywriting_history ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
@@ -31,6 +48,27 @@ CREATE POLICY "Users can read own profile"
 CREATE POLICY "Users can update own profile" 
   ON profiles FOR UPDATE 
   USING (auth.uid() = id);
+
+-- Business Profiles policies
+-- Users can read their own business profiles
+CREATE POLICY "Users can read own business profiles" 
+  ON business_profiles FOR SELECT 
+  USING (auth.uid() = user_id);
+
+-- Users can insert their own business profiles
+CREATE POLICY "Users can insert own business profiles" 
+  ON business_profiles FOR INSERT 
+  WITH CHECK (auth.uid() = user_id);
+
+-- Users can update their own business profiles
+CREATE POLICY "Users can update own business profiles" 
+  ON business_profiles FOR UPDATE 
+  USING (auth.uid() = user_id);
+
+-- Users can delete their own business profiles
+CREATE POLICY "Users can delete own business profiles" 
+  ON business_profiles FOR DELETE 
+  USING (auth.uid() = user_id);
 
 -- Users can read their own copywriting history
 CREATE POLICY "Users can read own copywriting history" 

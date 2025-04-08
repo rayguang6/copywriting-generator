@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from 'react';
-import { FiMenu, FiPlusCircle, FiLogOut, FiLogIn } from 'react-icons/fi';
+import { FiMenu, FiPlusCircle, FiLogOut, FiLogIn, FiUser, FiBriefcase } from 'react-icons/fi';
 import { useAuthContext } from '@/providers/AuthProvider';
 import Link from 'next/link';
+import { CopywritingFramework } from '@/lib/types';
 
 // Sample copywriting frameworks
 const frameworks = [
-  { id: 1, name: 'AIDA (Attention, Interest, Desire, Action)' },
-  { id: 2, name: 'PAS (Problem, Agitate, Solution)' },
-  { id: 3, name: 'BAB (Before, After, Bridge)' },
-  { id: 4, name: 'The 4 Ps (Promise, Picture, Proof, Push)' },
-  { id: 5, name: 'ACCA (Awareness, Comprehension, Conviction, Action)' },
-  { id: 6, name: 'FAB (Features, Advantages, Benefits)' }
+  { id: 1, name: CopywritingFramework.AIDA },
+  { id: 2, name: CopywritingFramework.PAS },
+  { id: 3, name: CopywritingFramework.BAB },
+  { id: 4, name: CopywritingFramework.FOUR_PS },
+  { id: 5, name: CopywritingFramework.ACCA },
+  { id: 6, name: CopywritingFramework.FAB }
 ];
 
 export default function Sidebar({ onSelectFramework }: { onSelectFramework: (framework: string) => void }) {
@@ -77,6 +78,16 @@ export default function Sidebar({ onSelectFramework }: { onSelectFramework: (fra
                   </div>
                   <span className="text-sm truncate">{user.email}</span>
                 </div>
+                
+                {/* Business Profiles Link */}
+                <Link
+                  href="/business-profiles"
+                  className="flex items-center gap-2 w-full rounded-md p-2 text-sm hover:bg-gray-700 transition mb-1"
+                >
+                  <FiBriefcase size={16} />
+                  <span>Business Profiles</span>
+                </Link>
+                
                 <button 
                   onClick={handleSignOut}
                   className="flex items-center gap-2 w-full rounded-md p-2 text-sm hover:bg-gray-700 transition"
