@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from 'react';
-import { FiMenu, FiPlusCircle } from 'react-icons/fi';
+import { FiMenu, FiPlusCircle, FiLogOut, FiLogIn } from 'react-icons/fi';
+import { useAuthContext } from '@/providers/AuthProvider';
+import Link from 'next/link';
 
 // Sample copywriting frameworks
 const frameworks = [
@@ -15,6 +17,15 @@ const frameworks = [
 
 export default function Sidebar({ onSelectFramework }: { onSelectFramework: (framework: string) => void }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, signOut } = useAuthContext();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   return (
     <>
@@ -56,14 +67,30 @@ export default function Sidebar({ onSelectFramework }: { onSelectFramework: (fra
             </div>
           </div>
           
-          {/* User profile at bottom */}
+          {/* Auth section at bottom */}
           <div className="mt-auto border-t border-gray-700 pt-2 px-2">
-            <button className="flex items-center gap-2 w-full rounded-md p-2 text-sm hover:bg-gray-700 transition">
-              <div className="h-8 w-8 rounded-full bg-gray-500 flex items-center justify-center">
-                U
-              </div>
-              <span className="text-sm">User</span>
-            </button>
+            {user ? (
+              <>
+                <div className="flex items-center gap-2 p-2 text-sm">
+                  <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
+                    {user.email ? user.email[0].toUpperCase() : 'U'}
+                  </div>
+                  <span className="text-sm truncate">{user.email}</span>
+                </div>
+                <button 
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2 w-full rounded-md p-2 text-sm hover:bg-gray-700 transition"
+                >
+                  <FiLogOut size={16} />
+                  <span>Sign out</span>
+                </button>
+              </>
+            ) : (
+              <Link href="/auth" className="flex items-center gap-2 w-full rounded-md p-2 text-sm hover:bg-gray-700 transition">
+                <FiLogIn size={16} />
+                <span>Sign in</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>
