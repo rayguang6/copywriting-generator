@@ -85,7 +85,7 @@ export default function Chat({ selectedFramework }: ChatProps) {
       const framework = selectedFramework ? 
         Object.values(CopywritingFramework).find(f => f === selectedFramework) : 
         undefined;
-        
+      
       // Generate copy with the AI service
       const generatedText = await generateCopy({
         prompt: inputValue,
@@ -137,7 +137,9 @@ export default function Chat({ selectedFramework }: ChatProps) {
           <div className="py-8 px-4 md:px-8">
             <div className="max-w-4xl mx-auto">
               <div className="flex justify-between items-start mb-6">
-                <h2 className="text-xl font-semibold">Generated Copywriting</h2>
+                <h2 className="text-xl font-semibold">
+                  {selectedFramework || 'AIDA Framework'} Copy
+                </h2>
                 <div className="flex gap-2">
                   <button 
                     onClick={handleCopyToClipboard}
@@ -191,11 +193,29 @@ export default function Chat({ selectedFramework }: ChatProps) {
                 </div>
               )}
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-                <div className="col-span-1 bg-[#3e3f4b] hover:bg-[#4a4b57] transition-colors p-4 rounded-lg">
-                  <h3 className="text-lg font-medium mb-2">Hi Sifu, I need help!</h3>
-                  <p className="text-sm text-gray-300">Get writing assistance using any copywriting framework.</p>
-                </div>
+              <div className="bg-[#3e3f4b] p-6 rounded-lg w-full max-w-2xl">
+                <h3 className="text-xl font-medium mb-4">Generate Copywriting</h3>
+                <p className="text-gray-300 mb-4">
+                  Enter a topic or product description below to generate marketing copy{selectedFramework ? ` using the ${selectedFramework} framework` : ''}:
+                </p>
+                {selectedFramework === CopywritingFramework.AIDA ? (
+                  <ul className="list-disc list-inside text-sm text-gray-300 mb-4 space-y-1">
+                    <li><strong>Attention:</strong> Grab the audience's attention</li>
+                    <li><strong>Interest:</strong> Generate interest with compelling details</li>
+                    <li><strong>Desire:</strong> Create desire for the product/service</li>
+                    <li><strong>Action:</strong> Prompt the audience to take action</li>
+                  </ul>
+                ) : selectedFramework === CopywritingFramework.FAB ? (
+                  <ul className="list-disc list-inside text-sm text-gray-300 mb-4 space-y-1">
+                    <li><strong>Features:</strong> List the product's features</li>
+                    <li><strong>Advantages:</strong> Explain the advantages of these features</li>
+                    <li><strong>Benefits:</strong> Emphasize the benefits users will experience</li>
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-300 mb-4">
+                    Select a framework from the sidebar to get started.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -255,7 +275,7 @@ export default function Chat({ selectedFramework }: ChatProps) {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={`Ask for copywriting help${selectedFramework ? ` using ${selectedFramework}` : ''}`}
+              placeholder={`Enter a topic or product description${selectedFramework ? ` for ${selectedFramework}` : ''}`}
               className="flex-1 bg-transparent border-0 outline-none p-2 text-sm"
               disabled={isGenerating}
             />
@@ -270,7 +290,7 @@ export default function Chat({ selectedFramework }: ChatProps) {
           
           <div className="flex justify-between items-center">
             <p className="text-xs text-gray-400 mt-2">
-              {isGenerating ? "Generating..." : "ChatGPT can make mistakes. Check important info."}
+              {isGenerating ? "Generating..." : "Powered by Deepseek AI"}
             </p>
             
             {!user && (

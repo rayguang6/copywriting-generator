@@ -19,16 +19,11 @@ export interface CopywritingHistory {
   created_at: string;
   user_id: string;
   business_profile_id: string | null;
-  framework: string;
   prompt: string;
   result: string;
 }
 
 export enum CopywritingFramework {
   AIDA = 'AIDA (Attention, Interest, Desire, Action)',
-  PAS = 'PAS (Problem, Agitate, Solution)',
-  BAB = 'BAB (Before, After, Bridge)',
-  FOUR_PS = 'The 4 Ps (Promise, Picture, Proof, Push)',
-  ACCA = 'ACCA (Awareness, Comprehension, Conviction, Action)',
   FAB = 'FAB (Features, Advantages, Benefits)'
 } 

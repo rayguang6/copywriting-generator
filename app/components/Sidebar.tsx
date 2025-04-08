@@ -6,14 +6,10 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import Link from 'next/link';
 import { CopywritingFramework } from '@/lib/types';
 
-// Sample copywriting frameworks
+// Copywriting frameworks
 const frameworks = [
   { id: 1, name: CopywritingFramework.AIDA },
-  { id: 2, name: CopywritingFramework.PAS },
-  { id: 3, name: CopywritingFramework.BAB },
-  { id: 4, name: CopywritingFramework.FOUR_PS },
-  { id: 5, name: CopywritingFramework.ACCA },
-  { id: 6, name: CopywritingFramework.FAB }
+  { id: 2, name: CopywritingFramework.FAB }
 ];
 
 export default function Sidebar({ onSelectFramework }: { onSelectFramework: (framework: string) => void }) {
@@ -26,6 +22,11 @@ export default function Sidebar({ onSelectFramework }: { onSelectFramework: (fra
     } catch (error) {
       console.error('Error signing out:', error);
     }
+  };
+
+  const handleNewChat = () => {
+    // Reset the chat by refreshing the page
+    window.location.href = '/';
   };
 
   return (
@@ -46,7 +47,10 @@ export default function Sidebar({ onSelectFramework }: { onSelectFramework: (fra
         <div className="flex flex-col h-full">
           {/* New chat button at top */}
           <div className="p-2">
-            <button className="flex items-center gap-3 w-full bg-transparent hover:bg-gray-700 transition border border-gray-600 rounded-md py-3 px-3 text-sm text-left">
+            <button 
+              onClick={handleNewChat}
+              className="flex items-center gap-3 w-full bg-transparent hover:bg-gray-700 transition border border-gray-600 rounded-md py-3 px-3 text-sm text-left"
+            >
               <FiPlusCircle size={16} />
               <span>New chat</span>
             </button>
