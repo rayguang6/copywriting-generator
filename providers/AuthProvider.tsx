@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { User } from '@supabase/supabase-js';
+import { ensureUserExists } from '@/lib/user-service'; 
 
 type AuthContextType = {
   user: User | null;
@@ -16,6 +17,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { user, loading, signIn: authSignIn, signUp: authSignUp, signOut: authSignOut } = useAuth();
+
+  // Ensure user record exists whenever the user changes
+  useEffect(() => {
+    if (user) {
+      ensureUserExists(user).catch(error => {
+        console.error('Failed to ensure user exists:', error);
+      });
+    }
+  }, [user]);
 
   const signIn = async (email: string, password: string) => {
     try {

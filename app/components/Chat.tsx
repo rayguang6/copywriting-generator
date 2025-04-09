@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { FiSend, FiInfo, FiCopy, FiCheck } from 'react-icons/fi';
-import { BusinessProfile, CopywritingFramework } from '@/lib/types';
+import { BusinessProfile, CopywritingFramework, Message as MessageType, Chat as ChatType } from '@/lib/types';
 import { getDefaultBusinessProfile, getUserBusinessProfiles } from '@/lib/business-profile-service';
 import { generateCopy } from '@/lib/ai-service';
+import { createChat, addMessage, getChatById, getChatMessages } from '@/lib/chat-service';
 import Link from 'next/link';
 import { useAuthContext } from '@/providers/AuthProvider';
 import ReactMarkdown from 'react-markdown';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 type ChatProps = {
   selectedFramework: string | null;
@@ -16,7 +18,8 @@ type ChatProps = {
 export default function Chat({ selectedFramework }: ChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedCopy, setGeneratedCopy] = useState<string | null>(null);
+  const [messages, setMessages] = useState<MessageType[]>([]);
+  const [currentChat, setCurrentChat] = useState<ChatType | null>(null);
   const [businessProfiles, setBusinessProfiles] = useState<BusinessProfile[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<BusinessProfile | null>(null);
   const [showProfileSelector, setShowProfileSelector] = useState(false);
@@ -25,6 +28,9 @@ export default function Chat({ selectedFramework }: ChatProps) {
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthContext();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const chatId = searchParams.get('chatId');
 
   // Load business profiles
   useEffect(() => {
@@ -55,12 +61,23 @@ export default function Chat({ selectedFramework }: ChatProps) {
     loadProfiles();
   }, [user]);
 
-  // Scroll to bottom when new content is generated
+  // Load existing chat if chatId is provided
   useEffect(() => {
-    if (generatedCopy && chatContainerRef.current) {
+    if (chatId) {
+      loadChat(chatId);
+    } else {
+      setLoading(false);
+      setMessages([]);
+      setCurrentChat(null);
+    }
+  }, [chatId]);
+
+  // Scroll to bottom when new messages are added
+  useEffect(() => {
+    if (messages.length > 0 && chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [generatedCopy]);
+  }, [messages]);
 
   // Reset copy to clipboard status after 2 seconds
   useEffect(() => {
@@ -73,50 +90,144 @@ export default function Chat({ selectedFramework }: ChatProps) {
     }
   }, [copiedToClipboard]);
 
+  // Load a chat by ID
+  const loadChat = async (id: string) => {
+    try {
+      setLoading(true);
+      const chatData = await getChatById(id);
+      setCurrentChat(chatData.chat);
+      setMessages(chatData.messages);
+
+      // If this chat has a framework, update the selected framework in the parent
+      // (This would require a callback to update the parent state, which is not implemented yet)
+    } catch (error) {
+      console.error('Error loading chat:', error);
+      setError('Failed to load chat. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputValue.trim() === '') return;
+    
+    if (!inputValue.trim() || isGenerating) return;
+    
+    // Set loading state
+    setIsGenerating(true);
+    setError(null);
+    
+    const userMessageContent = inputValue.trim();
+    
+    // Clear input immediately to prevent duplicate submissions
+    setInputValue('');
     
     try {
-      setIsGenerating(true);
-      setError(null);
+      // Create unique message ID for client-side only
+      const tempUserMessageId = `temp-user-${Date.now()}`;
       
-      // Get selected framework from the enum if available
-      const framework = selectedFramework ? 
-        Object.values(CopywritingFramework).find(f => f === selectedFramework) : 
-        undefined;
+      // Add user message to state immediately for UI responsiveness
+      const userMessage: MessageType = {
+        id: tempUserMessageId,
+        chat_id: chatId || '',
+        role: 'user',
+        content: userMessageContent,
+        created_at: new Date().toISOString(),
+      };
       
-      // Generate copy with the AI service
-      const generatedText = await generateCopy({
-        prompt: inputValue,
-        framework: framework as CopywritingFramework | undefined,
-        businessProfile: selectedProfile
-      });
+      setMessages(prevMessages => [...prevMessages, userMessage]);
       
-      setGeneratedCopy(generatedText);
-      setInputValue('');
-    } catch (err) {
-      console.error('Error generating copy:', err);
-      setError('Failed to generate copy. Please try again.');
+      // If we have a chat ID, save the message to the database
+      if (chatId) {
+        try {
+          const savedUserMessage = await addMessage(chatId, 'user', userMessageContent);
+          
+          // Update the message in state with the server-generated ID
+          setMessages(prevMessages => 
+            prevMessages.map(msg => 
+              msg.id === tempUserMessageId ? savedUserMessage : msg
+            )
+          );
+          
+        } catch (error) {
+          console.error('Failed to save user message to database:', error);
+          // Continue with local message since we've already updated the UI
+        }
+      }
+      
+      // Generate AI response
+      const previousMsgs = messages.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
+      
+      try {
+        // Use the correct generateCopy function
+        const response = await generateCopy({
+          prompt: userMessageContent,
+          framework: selectedFramework as CopywritingFramework,
+          businessProfile: selectedProfile,
+          previousMessages: previousMsgs as any
+        });
+        
+        // Create a temporary assistant message for immediate display
+        const tempAssistantMessageId = `temp-assistant-${Date.now()}`;
+        const assistantMessage: MessageType = {
+          id: tempAssistantMessageId,
+          chat_id: chatId || '',
+          role: 'assistant',
+          content: response,
+          created_at: new Date().toISOString(),
+        };
+        
+        // Add assistant message to UI
+        setMessages(prevMessages => [...prevMessages, assistantMessage]);
+        
+        // If we have a chat ID, save the assistant message to the database
+        if (chatId) {
+          try {
+            const savedAssistantMessage = await addMessage(chatId, 'assistant', response);
+            
+            // Update the message in state with the server-generated ID
+            setMessages(prevMessages => 
+              prevMessages.map(msg => 
+                msg.id === tempAssistantMessageId ? savedAssistantMessage : msg
+              )
+            );
+            
+          } catch (error) {
+            console.error('Failed to save assistant message to database:', error);
+            // Continue since we've already updated the UI
+          }
+        }
+        
+      } catch (error) {
+        console.error('Error in chat submission:', error);
+        setError('Failed to process your message. Please try again.');
+      }
+      
+    } catch (error) {
+      console.error('Error in chat submission:', error);
+      setError('Failed to process your message. Please try again.');
     } finally {
       setIsGenerating(false);
     }
   };
 
+  // Toggle profile selector
   const toggleProfileSelector = () => {
     setShowProfileSelector(!showProfileSelector);
   };
 
+  // Select a business profile
   const selectProfile = (profile: BusinessProfile) => {
     setSelectedProfile(profile);
     setShowProfileSelector(false);
   };
 
-  const handleCopyToClipboard = async () => {
-    if (!generatedCopy) return;
-    
+  const handleCopyToClipboard = async (content: string) => {
     try {
-      await navigator.clipboard.writeText(generatedCopy);
+      await navigator.clipboard.writeText(content);
       setCopiedToClipboard(true);
     } catch (err) {
       console.error('Failed to copy text:', err);
@@ -124,54 +235,89 @@ export default function Chat({ selectedFramework }: ChatProps) {
   };
 
   const handleNewChat = () => {
-    setGeneratedCopy(null);
+    setMessages([]);
+    setCurrentChat(null);
     setError(null);
     setInputValue('');
+    
+    // Remove chatId from URL
+    router.push('/');
+  };
+
+  const renderMessageContent = (message: MessageType) => {
+    if (message.role === 'assistant') {
+      return (
+        <div className="relative">
+          <div className="prose prose-invert max-w-none">
+            <ReactMarkdown>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+          <button 
+            onClick={() => handleCopyToClipboard(message.content)}
+            className="absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 p-1 rounded text-sm opacity-50 hover:opacity-100"
+            title="Copy to clipboard"
+          >
+            {copiedToClipboard ? <FiCheck size={16} /> : <FiCopy size={16} />}
+          </button>
+        </div>
+      );
+    }
+    
+    return <p>{message.content}</p>;
   };
 
   return (
     <div className="flex flex-col h-screen w-full md:ml-[260px] bg-[#343541] text-gray-100">
       <div className="flex-1 overflow-y-auto" ref={chatContainerRef}>
-        {generatedCopy ? (
-          // Display generated copy
-          <div className="py-8 px-4 md:px-8">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex justify-between items-start mb-6">
-                <h2 className="text-xl font-semibold">
-                  {selectedFramework || 'AIDA Framework'} Copy
-                </h2>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={handleCopyToClipboard}
-                    className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 py-1 px-3 rounded text-sm"
-                  >
-                    {copiedToClipboard ? (
-                      <>
-                        <FiCheck size={14} />
-                        <span>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <FiCopy size={14} />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
-                  <button 
-                    onClick={handleNewChat}
-                    className="bg-blue-600 hover:bg-blue-500 py-1 px-3 rounded text-sm"
-                  >
-                    New Chat
-                  </button>
+        {messages.length > 0 ? (
+          // Display conversation
+          <div className="py-8 px-4 md:px-8 max-w-4xl mx-auto space-y-6">
+            {currentChat && (
+              <div className="border-b border-gray-700 pb-4 mb-6">
+                <h2 className="text-xl font-semibold">{currentChat.title}</h2>
+                {selectedFramework && (
+                  <p className="text-sm text-gray-400">Framework: {selectedFramework}</p>
+                )}
+              </div>
+            )}
+            
+            {messages.map((message, index) => (
+              <div 
+                key={message.id || `temp-message-${index}`} 
+                className={`p-4 rounded-lg ${
+                  message.role === 'user' 
+                    ? 'bg-gray-700 ml-8 md:ml-12' 
+                    : 'bg-gray-800 mr-8 md:mr-12'
+                }`}
+              >
+                <div className="flex items-start">
+                  <div className="rounded-full w-8 h-8 flex items-center justify-center mr-3 mt-1 bg-gray-600">
+                    {message.role === 'user' ? 'U' : 'AI'}
+                  </div>
+                  <div className="flex-1">
+                    {renderMessageContent(message)}
+                  </div>
                 </div>
               </div>
-              
-              <div className="bg-gray-800 rounded-lg p-6 prose prose-invert max-w-none">
-                <ReactMarkdown>
-                  {generatedCopy}
-                </ReactMarkdown>
+            ))}
+            
+            {isGenerating && (
+              <div className="p-4 rounded-lg bg-gray-800 mr-8 md:mr-12">
+                <div className="flex items-start">
+                  <div className="rounded-full w-8 h-8 flex items-center justify-center mr-3 mt-1 bg-gray-600">
+                    AI
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse"></div>
+                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           // Empty state / welcome screen
@@ -252,6 +398,9 @@ export default function Chat({ selectedFramework }: ChatProps) {
                           )}
                         </button>
                       ))}
+                      <Link href="/business-profiles" className="block w-full text-left px-4 py-2 text-sm text-blue-400 hover:underline">
+                        Create New Profile
+                      </Link>
                     </div>
                   ) : (
                     <div className="p-3 text-sm text-gray-400">
