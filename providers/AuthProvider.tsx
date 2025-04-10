@@ -45,13 +45,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authSignUp(email, password);
       return {};
-    } catch (error) {
+    } catch (error: any) {
       console.error('Auth provider sign up error:', error);
-      return { 
-        error: error instanceof Error 
-          ? error 
-          : 'Failed to sign up. Please try again later.'
-      };
+      
+      // Check if this is our custom error for existing users
+      const errorMessage = error.message === 'User already registered with this email'
+        ? 'An account with this email already exists. Please sign in instead.'
+        : error instanceof Error 
+          ? error.message 
+          : 'Failed to sign up. Please try again later.';
+          
+      return { error: errorMessage };
     }
   };
 

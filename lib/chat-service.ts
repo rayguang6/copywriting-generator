@@ -67,7 +67,7 @@ export async function getChatById(id: string): Promise<{ chat: Chat, messages: M
  */
 export async function createChat(
   title: string,
-  framework: CopywritingFramework | undefined,
+  framework: string = 'aida',
   businessProfileId: string | null = null
 ): Promise<Chat> {
   // Get the current user from the session
@@ -107,14 +107,11 @@ export async function createChat(
     throw error;
   }
   
-  // Use a default framework if none is provided
-  const chatFramework = framework || CopywritingFramework.AIDA;
-  
   const { data, error } = await supabase
     .from('chats')
     .insert({
       title,
-      framework: chatFramework,
+      framework,
       business_profile_id: businessProfileId,
       is_archived: false,
       user_id: userId // Explicitly set the user_id

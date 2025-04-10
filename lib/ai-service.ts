@@ -1,8 +1,8 @@
-import { BusinessProfile, CopywritingFramework, Message } from './types';
+import { BusinessProfile, Message } from './types';
 
 interface GenerateParams {
   prompt: string;
-  framework?: CopywritingFramework;
+  framework?: string;
   businessProfile?: BusinessProfile | null;
   previousMessages?: Message[];
 }
@@ -13,8 +13,8 @@ const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 console.log('DEEPSEEK_API_KEY in ai-service:', DEEPSEEK_API_KEY ? 'Key is present' : 'Key is missing');
 
 // Mock response for development or when API fails
-const getMockResponse = (framework: CopywritingFramework | undefined, prompt: string): string => {
-  if (framework === CopywritingFramework.FAB) {
+const getMockResponse = (framework: string | undefined, prompt: string): string => {
+  if (framework === 'FAB') {
     return `
 # Features
 - Feature 1: This is a mock response for "${prompt}"

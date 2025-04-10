@@ -29,7 +29,7 @@ export interface Chat {
   updated_at: string;
   user_id: string;
   title: string;
-  framework: CopywritingFramework;
+  framework: string;
   business_profile_id: string | null;
   is_archived: boolean;
 }
@@ -42,7 +42,9 @@ export interface Message {
   created_at: string;
 }
 
+// Legacy enum - kept for backward compatibility but should use framework IDs ('aida', 'fab', 'pas') instead
 export enum CopywritingFramework {
   AIDA = 'AIDA (Attention, Interest, Desire, Action)',
-  FAB = 'FAB (Features, Advantages, Benefits)'
+  FAB = 'FAB (Features, Advantages, Benefits)',
+  PAS = 'PAS (Problem, Agitate, Solution)'
 } 

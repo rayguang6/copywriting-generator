@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,13 +30,27 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
+        // Validate passwords match
+        if (password !== confirmPassword) {
+          setError("Passwords don't match");
+          setLoading(false);
+          return;
+        }
+
         const result = await signUp(email, password);
         if (result.error) {
-          setError(typeof result.error === 'string' ? result.error : result.error.message);
+          // Handle specific error for existing user
+          const errorMessage = String(result.error);
+          if (errorMessage.includes('User already registered')) {
+            setError('This email is already registered. Please sign in instead.');
+          } else {
+            setError(typeof result.error === 'string' ? result.error : result.error.message);
+          }
         } else {
           setMessage('Check your email for the confirmation link!');
           setEmail('');
           setPassword('');
+          setConfirmPassword('');
         }
       } else {
         const result = await signIn(email, password);
@@ -50,6 +65,15 @@ export default function AuthPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Toggle between sign in and sign up mode
+  const toggleAuthMode = () => {
+    setIsSignUp(!isSignUp);
+    setError(null);
+    setMessage(null);
+    setPassword('');
+    setConfirmPassword('');
   };
 
   return (
@@ -100,6 +124,22 @@ export default function AuthPage() {
             />
           </div>
 
+          {isSignUp && (
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-[#40414f] border border-gray-600 rounded-md text-white"
+                required
+              />
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
@@ -111,7 +151,7 @@ export default function AuthPage() {
 
         <div className="mt-4 text-center">
           <button
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={toggleAuthMode}
             className="text-blue-400 hover:text-blue-300 text-sm"
           >
             {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}

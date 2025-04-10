@@ -62,8 +62,15 @@ export function useAuth() {
 
   const signUp = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      
       if (error) throw error;
+      
+      // Check if user already exists (Supabase returns identityId = null for existing users)
+      // This happens when the API doesn't error but the user already exists
+      if (data?.user?.identities?.length === 0) {
+        throw new Error('User already registered with this email');
+      }
     } catch (err) {
       console.error('Sign up error:', err);
       throw err;
