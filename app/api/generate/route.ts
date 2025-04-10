@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BusinessProfile, Message } from '@/lib/types';
-import { generateSystemPrompt, generateMockResponse, convertLegacyFramework } from '@/lib/framework-service';
+import { generateSystemPrompt, generateMockResponse, getFrameworkById } from '@/lib/framework-service';
 
 // Deepseek API endpoint and API key
 const DEEPSEEK_API_ENDPOINT = 'https://api.deepseek.com/v1/chat/completions';
@@ -14,21 +14,27 @@ export async function POST(request: NextRequest) {
     const { prompt, framework, businessProfile, previousMessages = [] } = requestData;
     
     // Enhanced logging
-    console.log("API received raw framework:", framework);
+    console.log("API received framework:", framework);
     console.log("Framework type:", typeof framework);
     
-    // Convert legacy framework format to new framework ID format
-    const frameworkId = convertLegacyFramework(framework);
+    // Use the framework ID directly or default to 'aida' if it's invalid
+    const frameworkId = typeof framework === 'string' && framework.trim() !== '' 
+      ? framework.toLowerCase() 
+      : 'aida';
     
-    console.log("Converted to frameworkId:", frameworkId);
+    // Validate that the framework exists
+    const frameworkExists = getFrameworkById(frameworkId);
+    const finalFrameworkId = frameworkExists ? frameworkId : 'aida'; // Fallback to aida if not found
+    
+    console.log("Using frameworkId:", finalFrameworkId);
     
     if (!DEEPSEEK_API_KEY) {
       console.error('DeepSeek API key is missing. Please check your .env.local file.');
-      return NextResponse.json({ content: generateMockResponse(frameworkId, prompt) });
+      return NextResponse.json({ content: generateMockResponse(finalFrameworkId, prompt) });
     }
     
     // Generate system prompt based on framework and business profile
-    const systemMessage = generateSystemPrompt(frameworkId, businessProfile);
+    const systemMessage = generateSystemPrompt(finalFrameworkId, businessProfile);
     
     // Prepare the conversation messages
     const messages = [
@@ -40,7 +46,6 @@ export async function POST(request: NextRequest) {
       { role: 'user', content: prompt }
     ];
     
-    console.log("Using frameworkId:", frameworkId);
     console.log("System message:", systemMessage.substring(0, 100) + "...");
     
     try {
@@ -59,14 +64,14 @@ export async function POST(request: NextRequest) {
   
       if (!response.ok) {
         console.error('DeepSeek API error:', response.status, response.statusText);
-        return NextResponse.json({ content: generateMockResponse(frameworkId, prompt) });
+        return NextResponse.json({ content: generateMockResponse(finalFrameworkId, prompt) });
       }
   
       const data = await response.json();
       return NextResponse.json({ content: data.choices[0].message.content });
     } catch (error) {
       console.error('Error generating copy:', error);
-      return NextResponse.json({ content: generateMockResponse(frameworkId, prompt) });
+      return NextResponse.json({ content: generateMockResponse(finalFrameworkId, prompt) });
     }
   } catch (error) {
     console.error('Error parsing request:', error);

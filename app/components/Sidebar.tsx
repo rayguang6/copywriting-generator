@@ -223,10 +223,11 @@ export default function Sidebar({ onSelectFramework, onSelectChat }: {
               {frameworks.map((framework) => (
                 <button
                   key={framework.id}
-                  className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-700 transition cursor-pointer"
+                  className="w-full font-medium text-left flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-gray-700 transition cursor-pointer"
                   onClick={() => handleSelectFramework(framework.id)}
                 >
-                  {formatFrameworkName(framework)}
+                <FiEdit2 size={14} />
+                {formatFrameworkName(framework)}
                 </button>
               ))}
             </div>

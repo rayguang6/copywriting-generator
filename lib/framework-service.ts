@@ -8,7 +8,8 @@ export interface Framework {
   systemPrompt: string;
 }
 
-// Collection of all available frameworks
+// Collection of all available frameworks 
+// To add a new framework, simply add a new object to this array
 const frameworks: Framework[] = [
   {
     id: 'aida',
@@ -36,7 +37,28 @@ When responding to user queries, structure your copy in clear sections with head
 {{businessContext}}
 
 When responding to user queries, structure your copy in clear sections with headings for Problem, Agitate, and Solution, unless the user asks for a different format.`
-  }
+  },
+  // Example of a marketing framework
+  {
+    id: 'foursps',
+    name: '4Ps',
+    description: 'Product, Price, Place, Promotion',
+    systemPrompt: `You are a marketing assistant that specializes in the 4Ps (Product, Price, Place, Promotion) framework.
+{{businessContext}}
+
+When responding to user queries, structure your recommendations in clear sections with headings for Product, Price, Place, and Promotion, unless the user asks for a different format.`
+  },
+  // Example of a sales framework
+  {
+    id: 'spin',
+    name: 'SPIN',
+    description: 'Situation, Problem, Implication, Need-payoff',
+    systemPrompt: `You are a sales assistant that specializes in the SPIN (Situation, Problem, Implication, Need-payoff) framework.
+{{businessContext}}
+
+When responding to user queries, structure your sales approach in clear sections with headings for Situation, Problem, Implication, and Need-payoff, unless the user asks for a different format.`
+  },
+  // Add more frameworks here as needed
 ];
 
 /**
@@ -111,6 +133,7 @@ ${businessProfile.brand_voice ? `Brand Voice: ${businessProfile.brand_voice}` : 
 
 /**
  * Generate a mock response for a framework (for testing or when API fails)
+ * Uses a template-based approach instead of conditional logic for extensibility
  */
 export function generateMockResponse(frameworkId: string, prompt: string): string {
   const framework = getFrameworkById(frameworkId);
@@ -121,81 +144,33 @@ export function generateMockResponse(frameworkId: string, prompt: string): strin
     return generateMockResponse('aida', prompt);
   }
   
-  if (framework.id === 'aida') {
-    return `
-# Attention
-This is a mock response for "${prompt}" because the API call failed.
-
-# Interest
-In production, this section would contain compelling AI-generated content that builds interest in your product or service.
-
-# Desire
-The mock system ensures your application continues functioning even when API services are unavailable.
-
-# Action
-When you're ready to deploy to production, ensure your API keys are properly configured in your environment variables.
-`;
-  } else if (framework.id === 'fab') {
-    return `
-# Features
-- Feature 1: This is a mock response for "${prompt}"
-- Feature 2: The API call failed, so you're seeing this fallback content
-- Feature 3: In production, this would be real AI-generated content
-
-# Advantages
-- Advantage 1: Even when the API fails, users still get a response
-- Advantage 2: Developers can test the UI without making API calls
-- Advantage 3: It's clear this is a mock response
-
-# Benefits
-- Benefit 1: Better user experience with graceful degradation
-- Benefit 2: Reduced frustration during API outages
-- Benefit 3: Clear indication when using fallback mode
-`;
-  } else if (framework.id === 'pas') {
-    return `
-# Problem
-This is a mock response for "${prompt}" because the API call failed.
-
-# Agitate
-When your AI service is down, it can be frustrating for users who need to create marketing copy quickly.
-
-# Solution
-Our graceful fallback system ensures you can still see a preview of how your content would be structured, even when the AI service is unavailable.
-`;
-  } else {
-    // Generic fallback that shouldn't be reached if we have proper framework IDs
-    return `# Mock Response\nThis is a mock response for "${prompt}" using an unknown framework.`;
-  }
-}
-
-/**
- * Convert legacy framework value to framework ID
- */
-export function convertLegacyFramework(value: string): string {
-  // If value is already a valid framework ID, return it directly
-  if (!value) return 'aida'; // Default
+  // Generic mock template system
+  // Instead of using a big if/else chain, use a template system based on framework structure
+  const mockTemplates: Record<string, (prompt: string) => string> = {
+    // Default template that works for any framework
+    default: (prompt: string) => {
+      // Extract section headers from the framework's system prompt
+      const sectionRegex = /headings for ([^,]+)(?:,\s+([^,]+))?(?:,\s+([^,]+))?(?:,\s+and\s+([^,]+))?/i;
+      const match = framework?.systemPrompt.match(sectionRegex);
+      
+      if (match) {
+        // Extract section headers from the regex match
+        const sections = match.slice(1).filter(Boolean);
+        
+        // Generate mock content for each section
+        return sections.map(section => 
+          `# ${section}\nThis is a mock response for "${prompt}" using the ${framework?.name} framework. In production, this would contain AI-generated content.`
+        ).join('\n\n');
+      }
+      
+      // Fallback if no sections are found
+      return `# Mock Response\nThis is a mock response for "${prompt}" using the ${framework?.name} framework.`;
+    }
+  };
   
-  // Normalize to lowercase
-  const lowercaseValue = value.toLowerCase();
-  
-  // Check if it's already a valid ID
-  if (frameworks.some(f => f.id === lowercaseValue)) {
-    return lowercaseValue;
-  }
-  
-  // Check if it matches our specific framework names
-  if (lowercaseValue.includes('aida')) return 'aida';
-  if (lowercaseValue.includes('fab')) return 'fab';
-  if (lowercaseValue.includes('pas')) return 'pas';
-  
-  // Try to match by name
-  const framework = getFrameworkByName(value);
-  if (framework) return framework.id;
-  
-  // Default to AIDA if no match found
-  console.warn(`Could not convert framework value "${value}" to a valid ID, defaulting to AIDA`);
-  return 'aida';
+  // Use specific template if available, otherwise use the default one
+  const templateFn = mockTemplates[framework.id] || mockTemplates.default;
+  return templateFn(prompt);
 }
 
 /**
@@ -205,7 +180,7 @@ export function getFrameworkDisplayName(frameworkId: string): string {
   // If we pass undefined or null, default to unknown
   if (!frameworkId) return "Unknown Framework";
   
-  // First, try to get the framework by its ID
+  // Try to get the framework by its ID
   const framework = getFrameworkById(frameworkId);
   
   // If found, return its formatted name
@@ -213,12 +188,6 @@ export function getFrameworkDisplayName(frameworkId: string): string {
     return formatFrameworkName(framework);
   }
   
-  // If not found, try to convert it as a legacy framework and get the display name
-  const convertedId = convertLegacyFramework(frameworkId);
-  const convertedFramework = getFrameworkById(convertedId);
-  
-  // Return the formatted name if found after conversion, or the original value
-  return convertedFramework 
-    ? formatFrameworkName(convertedFramework) 
-    : frameworkId; // Fall back to the original value
+  // If no framework found for this ID, just return the ID as a fallback
+  return frameworkId;
 } 
