@@ -31,7 +31,7 @@ export interface Chat {
   title: string;
   framework: string;
   business_profile_id: string | null;
-  is_archived: boolean;
+  archived: boolean;
 }
 
 export interface Message {

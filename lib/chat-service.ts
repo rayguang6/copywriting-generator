@@ -1,65 +1,103 @@
 import { supabase } from './supabase';
-import { Chat, Message, CopywritingFramework } from './types';
+import { BusinessProfile } from './types';
+import { getCurrentUser } from './user-service';
+
+export interface Message {
+  id: string;
+  chat_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+}
+
+export interface Chat {
+  id: string;
+  user_id: string;
+  title: string;
+  framework: string;
+  business_profile_id: string | null;
+  created_at: string;
+  archived: boolean;
+  business_profile?: BusinessProfile;
+  messages?: Message[];
+}
 
 /**
- * Fetch all chats for the current user
+ * Get all chats for the current user
  */
 export async function getUserChats(): Promise<Chat[]> {
-  // Get the current user from the session
-  const { data: { session } } = await supabase.auth.getSession();
-  const userId = session?.user?.id;
-  
-  if (!userId) {
-    console.warn('No authenticated user found when fetching chats');
-    return [];
+  // Get the current user
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    throw new Error('You must be logged in to view chats');
   }
-  
+
+  // Get user's chats
   const { data, error } = await supabase
     .from('chats')
-    .select('*')
-    .eq('user_id', userId)
-    .order('updated_at', { ascending: false });
-  
+    .select(`
+      *,
+      business_profile:business_profile_id (
+        id, 
+        name, 
+        industry, 
+        target_audience, 
+        unique_value_proposition,
+        pain_points,
+        brand_voice
+      )
+    `)
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false });
+
   if (error) {
-    console.error('Error fetching chats:', error);
+    console.error('Error getting chats:', error);
     throw error;
   }
-  
+
   return data || [];
 }
 
 /**
- * Fetch a specific chat by ID, including its messages
+ * Get a chat by id, including messages
  */
-export async function getChatById(id: string): Promise<{ chat: Chat, messages: Message[] }> {
-  // Get the chat
-  const { data: chat, error: chatError } = await supabase
+export async function getChatById(id: string): Promise<Chat | null> {
+  const { data, error } = await supabase
     .from('chats')
-    .select('*')
+    .select(`
+      *,
+      business_profile:business_profile_id (
+        id, 
+        name, 
+        industry, 
+        target_audience, 
+        unique_value_proposition,
+        pain_points,
+        brand_voice
+      ),
+      messages (
+        id,
+        role,
+        content,
+        created_at
+      )
+    `)
     .eq('id', id)
     .single();
-  
-  if (chatError) {
-    console.error('Error fetching chat:', chatError);
-    throw chatError;
+
+  if (error) {
+    console.error('Error getting chat:', error);
+    throw error;
   }
-  
-  // Get the messages for this chat
-  const { data: messages, error: messagesError } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('chat_id', id)
-    .order('created_at', { ascending: true });
-  
-  if (messagesError) {
-    console.error('Error fetching messages:', messagesError);
-    throw messagesError;
+
+  // Sort messages by created_at
+  if (data && data.messages) {
+    data.messages.sort((a: Message, b: Message) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
   }
-  
-  return {
-    chat,
-    messages: messages || []
-  };
+
+  return data;
 }
 
 /**
@@ -67,85 +105,65 @@ export async function getChatById(id: string): Promise<{ chat: Chat, messages: M
  */
 export async function createChat(
   title: string,
-  framework: string = 'aida',
-  businessProfileId: string | null = null
+  framework: string,
+  businessProfileId: string | null
 ): Promise<Chat> {
-  // Get the current user from the session
-  const { data: { session } } = await supabase.auth.getSession();
-  const userId = session?.user?.id;
-  
-  if (!userId) {
-    throw new Error('User not authenticated. Please sign in to create a chat.');
+  // Get the current user
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    console.error('Create chat failed: User not authenticated');
+    throw new Error('You must be logged in to create a chat');
   }
 
-  // Ensure the user exists in the public users table
   try {
-    // First check if the user exists in the public users table
-    const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', userId)
+    const { data, error } = await supabase
+      .from('chats')
+      .insert({
+        title,
+        framework,
+        business_profile_id: businessProfileId,
+        user_id: currentUser.id,
+        archived: false,
+      })
+      .select()
       .single();
-    
-    if (checkError || !existingUser) {
-      // User doesn't exist in the public table, let's insert them
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert({
-          id: userId,
-          email: session.user.email,
-          created_at: new Date().toISOString()
-        });
-      
-      if (insertError) {
-        console.error('Error creating user in public table:', insertError);
-        throw new Error('Failed to create user record. Please try again or contact support.');
-      }
+
+    if (error) {
+      console.error('Error creating chat:', error.message, error.details, error.hint);
+      throw error;
     }
+
+    if (!data) {
+      console.error('Create chat failed: No data returned from database');
+      throw new Error('No data returned when creating chat');
+    }
+
+    return data;
   } catch (error) {
-    console.error('Error checking/creating user:', error);
-    throw error;
+    console.error('Unexpected error in createChat:', error);
+    throw new Error('Failed to create new chat. Please try again.');
   }
-  
-  const { data, error } = await supabase
-    .from('chats')
-    .insert({
-      title,
-      framework,
-      business_profile_id: businessProfileId,
-      is_archived: false,
-      user_id: userId // Explicitly set the user_id
-    })
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Error creating chat:', error);
-    throw error;
-  }
-  
-  return data;
 }
 
 /**
- * Update a chat (e.g., title, archived status)
+ * Update a chat
  */
-export async function updateChat(id: string, updates: Partial<Omit<Chat, 'id' | 'created_at' | 'user_id'>>): Promise<Chat> {
+export async function updateChat(
+  id: string,
+  updates: Partial<Omit<Chat, 'id' | 'created_at' | 'user_id'>>
+): Promise<Chat> {
   const { data, error } = await supabase
     .from('chats')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString()
-    })
+    .update(updates)
     .eq('id', id)
     .select()
     .single();
-  
+
   if (error) {
     console.error('Error updating chat:', error);
     throw error;
   }
-  
+
   return data;
 }
 
@@ -155,9 +173,9 @@ export async function updateChat(id: string, updates: Partial<Omit<Chat, 'id' | 
 export async function archiveChat(id: string): Promise<void> {
   const { error } = await supabase
     .from('chats')
-    .update({ is_archived: true, updated_at: new Date().toISOString() })
+    .update({ archived: true })
     .eq('id', id);
-  
+
   if (error) {
     console.error('Error archiving chat:', error);
     throw error;
@@ -165,111 +183,89 @@ export async function archiveChat(id: string): Promise<void> {
 }
 
 /**
- * Delete a chat and all its messages
+ * Delete a chat and its messages
  */
 export async function deleteChat(id: string): Promise<void> {
-  // First delete all messages in this chat
-  const { error: messagesError } = await supabase
+  const { error: deleteMessagesError } = await supabase
     .from('messages')
     .delete()
     .eq('chat_id', id);
-  
-  if (messagesError) {
-    console.error('Error deleting chat messages:', messagesError);
-    throw messagesError;
+
+  if (deleteMessagesError) {
+    console.error('Error deleting messages:', deleteMessagesError);
+    throw deleteMessagesError;
   }
-  
-  // Then delete the chat itself
-  const { error: chatError } = await supabase
+
+  const { error: deleteChatError } = await supabase
     .from('chats')
     .delete()
     .eq('id', id);
-  
-  if (chatError) {
-    console.error('Error deleting chat:', chatError);
-    throw chatError;
+
+  if (deleteChatError) {
+    console.error('Error deleting chat:', deleteChatError);
+    throw deleteChatError;
   }
 }
 
 /**
- * Add a new message to a chat
+ * Add a message to a chat
  */
-export async function addMessage(chatId: string, role: 'user' | 'assistant', content: string): Promise<Message> {
-  // Verify the chat exists and belongs to the current user
-  const { data: { session } } = await supabase.auth.getSession();
-  const userId = session?.user?.id;
-  
-  if (!userId) {
-    throw new Error('User not authenticated. Please sign in to add messages.');
+export async function addMessage(
+  chatId: string,
+  role: 'user' | 'assistant',
+  content: string
+): Promise<Message> {
+  // Verify the current user has access to this chat
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    throw new Error('You must be logged in to add a message');
   }
   
-  try {
-    // Verify the chat belongs to the current user
-    const { data: chatData, error: chatCheckError } = await supabase
-      .from('chats')
-      .select('id')
-      .eq('id', chatId)
-      .eq('user_id', userId)
-      .single();
-      
-    if (chatCheckError) {
-      console.error('Error verifying chat ownership:', chatCheckError);
-      
-      if (chatCheckError.code === 'PGRST116') {
-        throw new Error('Chat not found. It may have been deleted.');
-      }
-      
-      throw new Error('You do not have permission to add messages to this chat.');
-    }
+  // Verify this chat belongs to the current user
+  const { data: chatData, error: chatError } = await supabase
+    .from('chats')
+    .select('id')
+    .eq('id', chatId)
+    .eq('user_id', currentUser.id)
+    .single();
     
-    // Add the message
-    const { data: message, error: messageError } = await supabase
-      .from('messages')
-      .insert({
-        chat_id: chatId,
-        role,
-        content
-      })
-      .select()
-      .single();
-    
-    if (messageError) {
-      console.error('Error adding message:', messageError);
-      throw messageError;
-    }
-    
-    // Update the chat's updated_at timestamp
-    const { error: chatError } = await supabase
-      .from('chats')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', chatId);
-    
-    if (chatError) {
-      console.error('Error updating chat timestamp:', chatError);
-      // Non-critical error, don't throw
-    }
-    
-    return message;
-  } catch (error) {
-    console.error('Error in addMessage:', error);
+  if (chatError || !chatData) {
+    console.error('Error verifying chat ownership:', chatError);
+    throw new Error('You do not have permission to add messages to this chat');
+  }
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      chat_id: chatId,
+      role,
+      content,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error adding message:', error);
     throw error;
   }
+
+  return data;
 }
 
 /**
- * Get all messages for a specific chat
+ * Get all messages for a chat
  */
 export async function getChatMessages(chatId: string): Promise<Message[]> {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
     .eq('chat_id', chatId)
-    .order('created_at', { ascending: true });
-  
+    .order('created_at');
+
   if (error) {
-    console.error('Error fetching messages:', error);
+    console.error('Error getting messages:', error);
     throw error;
   }
-  
+
   return data || [];
 } 

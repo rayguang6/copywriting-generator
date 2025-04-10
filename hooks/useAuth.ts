@@ -55,7 +55,7 @@ export function useAuth() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
     } catch (err) {
-      console.error('Sign in error:', err);
+      console.error('Sign in error:', err);``
       throw err;
     }
   };

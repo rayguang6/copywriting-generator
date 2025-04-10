@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { BusinessProfile } from './types';
+import { getCurrentUser } from './user-service';
 
 /**
  * Fetch all business profiles for the current user
@@ -58,6 +59,13 @@ export async function getDefaultBusinessProfile(): Promise<BusinessProfile | nul
  * Create a new business profile
  */
 export async function createBusinessProfile(profile: Omit<BusinessProfile, 'id' | 'created_at' | 'updated_at' | 'user_id'>): Promise<BusinessProfile> {
+  // Get the current user to get their ID
+  const currentUser = await getCurrentUser();
+  
+  if (!currentUser) {
+    throw new Error('You must be logged in to create a business profile');
+  }
+  
   // Get all existing profiles to determine if this is the first one (which should be default)
   const existingProfiles = await getUserBusinessProfiles();
   const isDefault = existingProfiles.length === 0 ? true : profile.is_default;
@@ -71,6 +79,7 @@ export async function createBusinessProfile(profile: Omit<BusinessProfile, 'id' 
     .from('business_profiles')
     .insert({
       ...profile,
+      user_id: currentUser.id,
       is_default: isDefault
     })
     .select()
